@@ -13,6 +13,7 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     currency = Column(String(8), nullable=True)
     date = Column(Date, nullable=False)
+    category = Column(String(128), nullable=True)
     merchant_name = Column(String(255), nullable=True)
     description = Column(String(512), nullable=True)
 

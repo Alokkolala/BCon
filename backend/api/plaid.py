@@ -42,6 +42,7 @@ def _serialize_transaction(tx: Transaction) -> Dict[str, Any]:
         "amount": tx.amount,
         "currency": tx.currency,
         "date": tx.date.isoformat(),
+        "category": tx.category,
         "merchant_name": tx.merchant_name,
         "description": tx.description,
     }
@@ -102,11 +103,17 @@ class PlaidService:
                 account_for_tx = next((acct for acct in accounts if acct.plaid_account_id == plaid_account_id), None)
                 if not account_for_tx:
                     continue
+                pf_category = tx_payload.get("personal_finance_category", {}) or {}
+                category = pf_category.get("primary") or pf_category.get("detailed")
+                if not category:
+                    categories = tx_payload.get("category") or []
+                    category = categories[0] if categories else None
                 transaction = Transaction(
                     account_id=account_for_tx.id,
                     amount=tx_payload.get("amount", 0.0),
                     currency=tx_payload.get("iso_currency_code") or tx_payload.get("unofficial_currency_code"),
                     date=dt.date.fromisoformat(tx_payload.get("date")),
+                    category=category,
                     merchant_name=tx_payload.get("merchant_name"),
                     description=tx_payload.get("name"),
                 )

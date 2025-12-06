@@ -1,10 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchAccounts, fetchTransactions } from '../api/financeClient.js';
+import { fetchAccounts, fetchTransactions, fetchBudgetSummary, saveBudgetGoal } from '../api/financeClient.js';
 import AccountBalanceCard from '../components/AccountBalanceCard.jsx';
 import TransactionsTable from '../components/TransactionsTable.jsx';
 import ExpenseIncomeChart from '../components/ExpenseIncomeChart.jsx';
 import TransactionHistory from '../components/TransactionHistory.jsx';
 import LoadingSpinner from '../components/LoadingSpinner.jsx';
+import BudgetGoalForm from '../components/BudgetGoalForm.jsx';
+import BudgetProgress from '../components/BudgetProgress.jsx';
+import BudgetAlerts from '../components/BudgetAlerts.jsx';
+import BudgetChart from '../components/BudgetChart.jsx';
+import InsightsPanel from '../components/InsightsPanel.jsx';
 
 const USER_ID = 1;
 
@@ -12,7 +17,7 @@ function categorizeTransaction(tx) {
   const isDeposit = Number(tx.amount || 0) >= 0;
   return {
     ...tx,
-    category: isDeposit ? 'Deposit' : 'Purchase',
+    category: tx.category || (isDeposit ? 'Deposit' : 'Purchase'),
   };
 }
 
@@ -39,6 +44,8 @@ function Dashboard() {
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [budgetSummary, setBudgetSummary] = useState({ budgets: [], alerts: [], recommendations: [], chart: [] });
+  const [savingGoal, setSavingGoal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -47,15 +54,17 @@ function Dashboard() {
       try {
         setLoading(true);
         setError('');
-        const [accountData, transactionData] = await Promise.all([
+        const [accountData, transactionData, budgetData] = await Promise.all([
           fetchAccounts(USER_ID),
           fetchTransactions(USER_ID),
+          fetchBudgetSummary(USER_ID),
         ]);
         setAccounts(accountData);
         const normalizedTx = transactionData
           .map(categorizeTransaction)
           .sort((a, b) => new Date(b.date) - new Date(a.date));
         setTransactions(normalizedTx);
+        setBudgetSummary(budgetData);
         if (accountData.length > 0) {
           setSelectedAccount(accountData[0]);
         }
@@ -80,6 +89,17 @@ function Dashboard() {
   }, [selectedAccount, transactions]);
 
   const chartSeries = useMemo(() => buildTrendSeries(transactions), [transactions]);
+
+  const handleSaveBudget = async (payload) => {
+    setSavingGoal(true);
+    try {
+      await saveBudgetGoal(payload);
+      const refreshed = await fetchBudgetSummary(USER_ID);
+      setBudgetSummary(refreshed);
+    } finally {
+      setSavingGoal(false);
+    }
+  };
 
   return (
     <div className="dashboard">
@@ -116,6 +136,25 @@ function Dashboard() {
           <section className="grid two-col">
             <TransactionsTable title="Recent transactions" transactions={recentTransactions} />
             <ExpenseIncomeChart data={chartSeries} />
+          </section>
+
+          <section className="grid two-col">
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Monthly budgets</div>
+                <div className="muted">Track your spending goals and thresholds</div>
+              </div>
+              <div className="card-body">
+                <BudgetAlerts alerts={budgetSummary.alerts} />
+                <BudgetProgress budgets={budgetSummary.budgets} />
+              </div>
+            </div>
+            <BudgetChart data={budgetSummary.chart} />
+          </section>
+
+          <section className="grid two-col">
+            <BudgetGoalForm onSave={handleSaveBudget} saving={savingGoal} />
+            <InsightsPanel recommendations={budgetSummary.recommendations} />
           </section>
 
           <section>

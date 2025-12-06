@@ -12,4 +12,5 @@ The frontend is a React application that renders the BankConnect dashboard and c
 1. Install dependencies: `cd frontend && npm install`.
 2. Create a `.env` file in `frontend/` with `VITE_API_BASE_URL=http://localhost:5000` (or your deployed backend URL).
 3. Start the dev server: `npm run dev` and open the provided local URL.
-4. The dashboard will fetch `/plaid/accounts` and `/plaid/transactions` for the signed-in user (configure user id handling as needed).
+4. The dashboard will fetch `/plaid/accounts`, `/plaid/transactions`, and `/budget/summary` for the signed-in user (configure user id handling as needed).
+5. Use the "Save budget" form to POST `/budget/goals` and visualize spending vs. goals and AI-like tips.

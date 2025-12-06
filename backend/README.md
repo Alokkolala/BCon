@@ -9,7 +9,7 @@ This backend is a Flask-based API server with authentication and Plaid integrati
 - `integrations/plaid_client.py`: Lightweight Plaid client wrapper with error handling for link token creation, public token exchange, account retrieval, transaction retrieval, and item removal.
 - `api/plaid.py`: Blueprint exposing endpoints to create link tokens, exchange public tokens, unlink accounts, and fetch accounts/transactions while persisting data securely.
 - `database/`: SQLAlchemy engine/session initialization.
-- `models/`: SQLAlchemy models for `User`, `Account`, and `Transaction`.
+- `models/`: SQLAlchemy models for `User`, `Account`, `Transaction`, and `Budget` (monthly spending goals).
 - `utils/crypto.py`: Symmetric encryption helper for protecting Plaid access tokens at rest.
 
 ## Environment variables
@@ -47,5 +47,9 @@ Pass `Authorization: Bearer <token>` from the auth endpoints above.
 - `POST /plaid/unlink` with `{ "plaid_account_id": "..." }` -> unlinks and removes stored data.
 - `GET /plaid/accounts` -> `{ "accounts": [...] }` for the authenticated user.
 - `GET /plaid/transactions` -> `{ "transactions": [...] }` for the authenticated user.
+
+### Budgeting + insights endpoints (protected with JWT)
+- `POST /budget/goals` with `{ category, monthly_limit, alert_threshold? }` to create or update a monthly spending goal.
+- `GET /budget/summary` -> aggregates monthly spend by category, budget utilization, alert messages when thresholds are crossed, and AI-like recommendations for savings.
 
 Errors from Plaid or persistence are returned as JSON `{ "error": "..." }` with appropriate status codes.

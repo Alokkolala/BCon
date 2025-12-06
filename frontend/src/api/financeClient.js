@@ -16,3 +16,17 @@ export async function fetchTransactions(userId) {
   const response = await client.get('/plaid/transactions', { params: { user_id: userId } });
   return response.data.transactions || [];
 }
+
+export async function fetchBudgetSummary(userId) {
+  const response = await client.get('/budget/summary', { params: { user_id: userId } });
+  return response.data;
+}
+
+export async function saveBudgetGoal({ category, monthly_limit, alert_threshold }) {
+  const response = await client.post('/budget/goals', {
+    category,
+    monthly_limit,
+    alert_threshold,
+  });
+  return response.data.budget;
+}
