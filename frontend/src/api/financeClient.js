@@ -30,3 +30,29 @@ export async function saveBudgetGoal({ category, monthly_limit, alert_threshold 
   });
   return response.data.budget;
 }
+
+export async function submitTransfer({ from_account_id, to_account_id, amount, note }) {
+  const response = await client.post('/payments/transfer', {
+    from_account_id,
+    to_account_id,
+    amount,
+    note,
+  });
+  return response.data.payment;
+}
+
+export async function submitBillPayment({ from_account_id, payee_name, payee_account, amount, note }) {
+  const response = await client.post('/payments/billpay', {
+    from_account_id,
+    payee_name,
+    payee_account,
+    amount,
+    note,
+  });
+  return response.data.payment;
+}
+
+export async function fetchPaymentHistory() {
+  const response = await client.get('/payments/history');
+  return response.data.payments || [];
+}

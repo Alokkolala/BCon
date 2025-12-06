@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { fetchAccounts, fetchTransactions, fetchBudgetSummary, saveBudgetGoal } from '../api/financeClient.js';
+import {
+  fetchAccounts,
+  fetchTransactions,
+  fetchBudgetSummary,
+  saveBudgetGoal,
+  submitTransfer,
+  submitBillPayment,
+  fetchPaymentHistory,
+} from '../api/financeClient.js';
 import AccountBalanceCard from '../components/AccountBalanceCard.jsx';
 import TransactionsTable from '../components/TransactionsTable.jsx';
 import ExpenseIncomeChart from '../components/ExpenseIncomeChart.jsx';
@@ -10,6 +18,9 @@ import BudgetProgress from '../components/BudgetProgress.jsx';
 import BudgetAlerts from '../components/BudgetAlerts.jsx';
 import BudgetChart from '../components/BudgetChart.jsx';
 import InsightsPanel from '../components/InsightsPanel.jsx';
+import TransferForm from '../components/TransferForm.jsx';
+import BillPayForm from '../components/BillPayForm.jsx';
+import PaymentHistory from '../components/PaymentHistory.jsx';
 
 const USER_ID = 1;
 
@@ -46,18 +57,22 @@ function Dashboard() {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [budgetSummary, setBudgetSummary] = useState({ budgets: [], alerts: [], recommendations: [], chart: [] });
   const [savingGoal, setSavingGoal] = useState(false);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
         setError('');
-        const [accountData, transactionData, budgetData] = await Promise.all([
+        const [accountData, transactionData, budgetData, paymentData] = await Promise.all([
           fetchAccounts(USER_ID),
           fetchTransactions(USER_ID),
           fetchBudgetSummary(USER_ID),
+          fetchPaymentHistory(),
         ]);
         setAccounts(accountData);
         const normalizedTx = transactionData
@@ -65,6 +80,7 @@ function Dashboard() {
           .sort((a, b) => new Date(b.date) - new Date(a.date));
         setTransactions(normalizedTx);
         setBudgetSummary(budgetData);
+        setPayments(paymentData);
         if (accountData.length > 0) {
           setSelectedAccount(accountData[0]);
         }
@@ -101,6 +117,39 @@ function Dashboard() {
     }
   };
 
+  const refreshPayments = async () => {
+    const latest = await fetchPaymentHistory();
+    setPayments(latest);
+  };
+
+  const handleTransfer = async (payload) => {
+    setSubmittingPayment(true);
+    setToast('');
+    try {
+      const result = await submitTransfer(payload);
+      await refreshPayments();
+      setToast(result?.message || 'Transfer submitted');
+    } catch (err) {
+      setToast(err?.response?.data?.error || 'Transfer failed');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const handleBillPayment = async (payload) => {
+    setSubmittingPayment(true);
+    setToast('');
+    try {
+      const result = await submitBillPayment(payload);
+      await refreshPayments();
+      setToast(result?.message || 'Bill payment submitted');
+    } catch (err) {
+      setToast(err?.response?.data?.error || 'Bill payment failed');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
   return (
     <div className="dashboard">
       <div className="section-header">
@@ -115,6 +164,7 @@ function Dashboard() {
 
       {loading && <LoadingSpinner message="Fetching bank data..." />}
       {error && <div className="alert error">{error}</div>}
+      {toast && <div className="alert success">{toast}</div>}
 
       {!loading && !error && (
         <>
@@ -155,6 +205,15 @@ function Dashboard() {
           <section className="grid two-col">
             <BudgetGoalForm onSave={handleSaveBudget} saving={savingGoal} />
             <InsightsPanel recommendations={budgetSummary.recommendations} />
+          </section>
+
+          <section className="grid two-col">
+            <TransferForm accounts={accounts} onSubmit={handleTransfer} submitting={submittingPayment} />
+            <BillPayForm accounts={accounts} onSubmit={handleBillPayment} submitting={submittingPayment} />
+          </section>
+
+          <section>
+            <PaymentHistory payments={payments} />
           </section>
 
           <section>

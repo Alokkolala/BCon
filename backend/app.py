@@ -6,6 +6,7 @@ from sqlalchemy.exc import OperationalError
 
 from backend.api.budget import init_budget_blueprint
 from backend.api.auth import init_auth_blueprint
+from backend.api.payments import init_payments_blueprint
 from backend.api.plaid import init_plaid_blueprint
 from backend.config import load_settings
 from backend.database import db
@@ -21,9 +22,11 @@ def create_app() -> Flask:
     auth_bp = init_auth_blueprint(settings)
     plaid_bp = init_plaid_blueprint(settings)
     budget_bp = init_budget_blueprint()
+    payments_bp = init_payments_blueprint()
     app.register_blueprint(auth_bp)
     app.register_blueprint(plaid_bp)
     app.register_blueprint(budget_bp)
+    app.register_blueprint(payments_bp)
 
     @app.get("/health")
     def health():

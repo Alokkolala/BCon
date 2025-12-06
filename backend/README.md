@@ -8,8 +8,10 @@ This backend is a Flask-based API server with authentication and Plaid integrati
 - `api/auth.py`: Blueprint for local and OAuth login, registration, password reset, and profile management endpoints.
 - `integrations/plaid_client.py`: Lightweight Plaid client wrapper with error handling for link token creation, public token exchange, account retrieval, transaction retrieval, and item removal.
 - `api/plaid.py`: Blueprint exposing endpoints to create link tokens, exchange public tokens, unlink accounts, and fetch accounts/transactions while persisting data securely.
+- `integrations/payments_client.py`: Stub payments gateway for initiating transfers and bill payments via providers like Plaid/Yodlee.
+- `api/payments.py`: Blueprint for secure transfers, bill payments, and retrieving payment history.
 - `database/`: SQLAlchemy engine/session initialization.
-- `models/`: SQLAlchemy models for `User`, `Account`, `Transaction`, and `Budget` (monthly spending goals).
+- `models/`: SQLAlchemy models for `User`, `Account`, `Transaction`, `Budget` (monthly spending goals), and `Payment` (transfers/bill-pay ledger).
 - `utils/crypto.py`: Symmetric encryption helper for protecting Plaid access tokens at rest.
 
 ## Environment variables
@@ -51,5 +53,10 @@ Pass `Authorization: Bearer <token>` from the auth endpoints above.
 ### Budgeting + insights endpoints (protected with JWT)
 - `POST /budget/goals` with `{ category, monthly_limit, alert_threshold? }` to create or update a monthly spending goal.
 - `GET /budget/summary` -> aggregates monthly spend by category, budget utilization, alert messages when thresholds are crossed, and AI-like recommendations for savings.
+
+### Payments, transfers, and bill pay (protected with JWT)
+- `POST /payments/transfer` with `{ from_account_id, to_account_id, amount, note? }` to move money between linked accounts.
+- `POST /payments/billpay` with `{ from_account_id, payee_name, amount, payee_account?, note? }` to initiate a bill payment.
+- `GET /payments/history` -> returns a ledger of past transfers and bill payments with confirmation details and statuses.
 
 Errors from Plaid or persistence are returned as JSON `{ "error": "..." }` with appropriate status codes.
