@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from flask import Blueprint, jsonify, request
 from sqlalchemy import delete, select
 
+from backend.auth.decorators import login_required
 from backend.config import Settings
 from backend.database.db import get_session
 from backend.integrations.plaid_client import PlaidClient, PlaidIntegrationError
@@ -16,16 +17,6 @@ from backend.models.user import User
 from backend.utils.crypto import CryptoManager
 
 plaid_bp = Blueprint("plaid", __name__, url_prefix="/plaid")
-
-
-def _ensure_user(session, user_id: int, email: str | None = None) -> User:
-    user = session.get(User, user_id)
-    if user:
-        return user
-    user = User(id=user_id, email=email or f"user-{user_id}@example.com")
-    session.add(user)
-    session.flush()
-    return user
 
 
 def _serialize_account(account: Account) -> Dict[str, Any]:
@@ -77,7 +68,9 @@ class PlaidService:
         )
 
         with get_session() as session:
-            user = _ensure_user(session, user_id)
+            user = session.get(User, user_id)
+            if not user:
+                raise RuntimeError("User not found")
             accounts = []
             for account_payload in accounts_data:
                 plaid_account_id = account_payload.get("account_id")
@@ -168,66 +161,69 @@ def init_plaid_blueprint(settings: Settings) -> Blueprint:
 
 
 @plaid_bp.route("/link-token", methods=["POST"])
+@login_required
 def link_token():
-    payload = request.get_json(force=True)
-    user_id = payload.get("user_id")
-    if user_id is None:
-        return jsonify({"error": "user_id is required"}), 400
+    from flask import g
+
     try:
-        token = service.create_link_token(int(user_id))
+        token = service.create_link_token(int(g.current_user.id))
         return jsonify({"link_token": token})
     except PlaidIntegrationError as exc:
         return jsonify({"error": str(exc)}), 502
 
 
 @plaid_bp.route("/exchange", methods=["POST"])
+@login_required
 def exchange_public_token():
+    from flask import g
+
     payload = request.get_json(force=True)
-    user_id = payload.get("user_id")
     public_token = payload.get("public_token")
-    if not user_id or not public_token:
-        return jsonify({"error": "user_id and public_token are required"}), 400
+    if not public_token:
+        return jsonify({"error": "public_token is required"}), 400
     try:
-        accounts = service.exchange_and_store(int(user_id), public_token)
+        accounts = service.exchange_and_store(int(g.current_user.id), public_token)
         return jsonify({"accounts": [_serialize_account(account) for account in accounts]})
     except PlaidIntegrationError as exc:
         return jsonify({"error": str(exc)}), 502
-    except Exception as exc:
+    except Exception:
         return jsonify({"error": "Failed to store account data"}), 500
 
 
 @plaid_bp.route("/unlink", methods=["POST"])
+@login_required
 def unlink_account():
+    from flask import g
+
     payload = request.get_json(force=True)
-    user_id = payload.get("user_id")
     plaid_account_id = payload.get("plaid_account_id")
-    if not user_id or not plaid_account_id:
-        return jsonify({"error": "user_id and plaid_account_id are required"}), 400
-    removed = service.unlink_account(int(user_id), plaid_account_id)
+    if not plaid_account_id:
+        return jsonify({"error": "plaid_account_id is required"}), 400
+    removed = service.unlink_account(int(g.current_user.id), plaid_account_id)
     if not removed:
         return jsonify({"error": "Account not found"}), 404
     return jsonify({"removed": True})
 
 
 @plaid_bp.route("/accounts", methods=["GET"])
+@login_required
 def list_accounts():
-    user_id = request.args.get("user_id")
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    from flask import g
+
     try:
-        accounts = service.list_accounts(int(user_id))
+        accounts = service.list_accounts(int(g.current_user.id))
         return jsonify({"accounts": accounts})
     except Exception:
         return jsonify({"error": "Failed to retrieve accounts"}), 500
 
 
 @plaid_bp.route("/transactions", methods=["GET"])
+@login_required
 def list_transactions():
-    user_id = request.args.get("user_id")
-    if not user_id:
-        return jsonify({"error": "user_id is required"}), 400
+    from flask import g
+
     try:
-        transactions = service.list_transactions(int(user_id))
+        transactions = service.list_transactions(int(g.current_user.id))
         return jsonify({"transactions": transactions})
     except Exception:
         return jsonify({"error": "Failed to retrieve transactions"}), 500

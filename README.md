@@ -14,6 +14,7 @@ BankConnect aggregates bank accounts and financial data into one interface. This
 - Node.js 18+ and npm/yarn **or** Python 3.11+ with pip
 - PostgreSQL or MongoDB instance
 - Plaid or Yodlee sandbox credentials for testing banking integrations
+- Secrets for JWT signing and optional OAuth providers (Google, Facebook, etc.)
 
 ### Initial Setup
 1. Clone the repository and install dependencies for your stack:

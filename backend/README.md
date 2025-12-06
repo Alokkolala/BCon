@@ -1,10 +1,11 @@
 # Backend
 
-This backend is a Flask-based API server with Plaid integration for aggregating user bank accounts.
+This backend is a Flask-based API server with authentication and Plaid integration for aggregating user bank accounts.
 
 ## Key modules
-- `app.py`: Flask application entrypoint that configures the database, Plaid blueprint, and a basic health endpoint.
-- `config.py`: Loads environment-driven configuration, including Plaid credentials, database URL, and encryption key.
+- `app.py`: Flask application entrypoint that configures the database, authentication, Plaid blueprint, and a basic health endpoint.
+- `config.py`: Loads environment-driven configuration, including Plaid credentials, database URL, encryption key, and JWT settings.
+- `api/auth.py`: Blueprint for local and OAuth login, registration, password reset, and profile management endpoints.
 - `integrations/plaid_client.py`: Lightweight Plaid client wrapper with error handling for link token creation, public token exchange, account retrieval, transaction retrieval, and item removal.
 - `api/plaid.py`: Blueprint exposing endpoints to create link tokens, exchange public tokens, unlink accounts, and fetch accounts/transactions while persisting data securely.
 - `database/`: SQLAlchemy engine/session initialization.
@@ -18,6 +19,11 @@ Set the following before running the server:
 - `PLAID_REDIRECT_URI`: Redirect URI for OAuth flows (optional).
 - `DATABASE_URL`: SQLAlchemy-compatible connection string (defaults to `sqlite:///bankconnect.db`).
 - `ENCRYPTION_KEY`: Secret used to encrypt Plaid access tokens at rest.
+- `JWT_SECRET`: Secret used to sign JWT access tokens.
+- `JWT_ALGORITHM`: JWT signing algorithm (default: `HS256`).
+- `JWT_EXP_MINUTES`: Access token lifetime in minutes (default: `60`).
+- `PASSWORD_RESET_EXP_MINUTES`: Password reset token lifetime in minutes (default: `30`).
+- `OAUTH_GOOGLE_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_SECRET`: Optional provider credentials for Google sign-in flows.
 
 ## Running locally
 1. `cd backend`
@@ -26,11 +32,20 @@ Set the following before running the server:
 4. Set environment variables above (a 32+ character string works for `ENCRYPTION_KEY`).
 5. `python app.py`
 
-The Plaid endpoints are served under `/plaid`. Example payloads:
-- `POST /plaid/link-token` with `{ "user_id": 1 }`.
-- `POST /plaid/exchange` with `{ "user_id": 1, "public_token": "public-sandbox-..." }`.
-- `POST /plaid/unlink` with `{ "user_id": 1, "plaid_account_id": "..." }`.
-- `GET /plaid/accounts?user_id=1`
-- `GET /plaid/transactions?user_id=1`
+### Auth endpoints
+- `POST /auth/register` with `{ "email": "user@example.com", "password": "...", "full_name": "User" }` -> returns `{ user, access_token }`.
+- `POST /auth/login` with `{ "email": "user@example.com", "password": "..." }` -> returns `{ user, access_token }`.
+- `POST /auth/oauth/callback` with `{ provider, external_id, email, provider_token }` to support third-party identity flows.
+- `POST /auth/password-reset/request` with `{ email }` returns a reset token (simulates sending via email).
+- `POST /auth/password-reset/confirm` with `{ token, new_password }` to update the password.
+- `GET /auth/profile` / `PUT /auth/profile` to view and update profile data (requires `Authorization: Bearer <token>`).
+
+### Plaid endpoints (protected with JWT)
+Pass `Authorization: Bearer <token>` from the auth endpoints above.
+- `POST /plaid/link-token` -> `{ "link_token": "..." }`.
+- `POST /plaid/exchange` with `{ "public_token": "public-sandbox-..." }` -> stores accounts and transactions.
+- `POST /plaid/unlink` with `{ "plaid_account_id": "..." }` -> unlinks and removes stored data.
+- `GET /plaid/accounts` -> `{ "accounts": [...] }` for the authenticated user.
+- `GET /plaid/transactions` -> `{ "transactions": [...] }` for the authenticated user.
 
 Errors from Plaid or persistence are returned as JSON `{ "error": "..." }` with appropriate status codes.

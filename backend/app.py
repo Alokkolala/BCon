@@ -4,6 +4,7 @@ from __future__ import annotations
 from flask import Flask, jsonify
 from sqlalchemy.exc import OperationalError
 
+from backend.api.auth import init_auth_blueprint
 from backend.api.plaid import init_plaid_blueprint
 from backend.config import load_settings
 from backend.database import db
@@ -16,7 +17,9 @@ def create_app() -> Flask:
     Base.metadata.create_all(db.auth_engine)
 
     app = Flask(__name__)
+    auth_bp = init_auth_blueprint(settings)
     plaid_bp = init_plaid_blueprint(settings)
+    app.register_blueprint(auth_bp)
     app.register_blueprint(plaid_bp)
 
     @app.get("/health")
